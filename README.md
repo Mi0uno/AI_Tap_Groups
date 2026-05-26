@@ -22,6 +22,12 @@ _用你配置的 AI 模型，自动整理 Edge 标签页分组。_
 
 > 目标不是简单按域名分组，而是让 AI 根据页面标题、站点和上下文做更接近人工习惯的标签页整理。
 
+## 界面预览
+
+| GitHub 项目页 | 扩展配置与分组状态 |
+| --- | --- |
+| [![GitHub 项目页](docs/screenshots/github-overview.png)](docs/screenshots/github-overview.png) | [![扩展配置与分组状态](docs/screenshots/popup-settings.png)](docs/screenshots/popup-settings.png) |
+
 ## 核心特性
 
 | 能力 | 说明 |
