@@ -20,6 +20,7 @@ const MANUAL_GROUP_JOB_KEY = "__aiTabGrouperManualJob";
 const AUTO_UNGROUPABLE_TABS_KEY = "__aiTabGrouperUngroupableTabs";
 const AUTO_GROUP_PERIODIC_FALLBACK_MINUTES = 5;
 const AUTO_GROUP_ALARM_FALLBACK_MINUTES = 0.5;
+const MANUAL_GROUP_ALARM_FALLBACK_MINUTES = 0.5;
 const UNGROUPED_GROUP_ID = -1;
 const JOB_STALE_AFTER_MS = 10 * 60 * 1000;
 const MAX_GROUPS_SETTING = 999;
@@ -160,7 +161,10 @@ async function enqueueManualGrouping(trigger) {
   };
 
   await chrome.storage.local.set({ [MANUAL_GROUP_JOB_KEY]: job });
-  await chrome.alarms.create(MANUAL_GROUP_ALARM, { delayInMinutes: 0.01 });
+  runManualGroupingJob().catch((error) => {
+    console.error("Failed to start manual grouping job immediately:", error);
+  });
+  await chrome.alarms.create(MANUAL_GROUP_ALARM, { delayInMinutes: MANUAL_GROUP_ALARM_FALLBACK_MINUTES });
   return job;
 }
 

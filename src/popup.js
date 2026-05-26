@@ -133,7 +133,7 @@ async function refreshJobStatus() {
     response = await sendMessage({ type: "GET_GROUP_JOB" });
   } catch (error) {
     if (error.message.includes("Unsupported message type: GET_GROUP_JOB")) {
-      setStatus("配置已载入。请在 edge://extensions/ 刷新扩展以启用后台任务状态。");
+      setStatus("配置已载入。请在 chrome://extensions/ 或 edge://extensions/ 刷新扩展以启用后台任务状态。");
       return;
     }
 
