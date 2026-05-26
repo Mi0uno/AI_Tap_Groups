@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>AI Tab Grouper</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main class="shell">
+      <header class="header">
+        <div>
+          <h1>AI Tab Grouper</h1>
+          <p id="status" class="status">读取配置中...</p>
+        </div>
+        <button id="groupTabsButton" class="icon-button primary" type="button" title="立即分组" aria-label="立即分组">
+          <span aria-hidden="true">⧉</span>
+        </button>
+      </header>
+
+      <section class="section">
+        <label class="field">
+          <span>接口地址</span>
+          <input id="endpointInput" type="url" autocomplete="off" spellcheck="false">
+        </label>
+
+        <label class="field">
+          <span>API Key</span>
+          <input id="apiKeyInput" type="password" autocomplete="off" spellcheck="false" placeholder="sk-...">
+        </label>
+
+        <label class="field">
+          <span>模型</span>
+          <input id="modelInput" type="text" autocomplete="off" spellcheck="false">
+        </label>
+      </section>
+
+      <section class="section grid">
+        <label class="field">
+          <span>范围</span>
+          <select id="scopeInput">
+            <option value="currentWindow">当前窗口</option>
+            <option value="allWindows">全部窗口</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>最多分组</span>
+          <input id="maxGroupsInput" type="number" min="2" max="999" step="1">
+        </label>
+      </section>
+
+      <section class="section">
+        <label class="field">
+          <span>AI 超时秒数</span>
+          <input id="aiTimeoutInput" type="number" min="10" max="180" step="5">
+        </label>
+      </section>
+
+      <section class="section">
+        <label class="field">
+          <span>分组前缀</span>
+          <input id="groupPrefixInput" type="text" maxlength="20" autocomplete="off" spellcheck="false" placeholder="可选">
+        </label>
+
+        <label class="toggle">
+          <input id="includePinnedInput" type="checkbox">
+          <span>包含固定标签页</span>
+        </label>
+
+        <label class="toggle">
+          <input id="sendFullUrlsInput" type="checkbox">
+          <span>发送完整 URL</span>
+        </label>
+      </section>
+
+      <section class="section auto-grid">
+        <label class="toggle auto-toggle">
+          <input id="autoGroupEnabledInput" type="checkbox">
+          <span>后台静默自动分组</span>
+        </label>
+
+        <label class="field">
+          <span>延迟秒数</span>
+          <input id="autoGroupDebounceInput" type="number" min="1" max="60" step="1">
+        </label>
+      </section>
+
+      <footer class="footer">
+        <button id="saveButton" class="button" type="button">保存配置</button>
+        <button id="saveAndGroupButton" class="button primary" type="button">保存并分组</button>
+      </footer>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

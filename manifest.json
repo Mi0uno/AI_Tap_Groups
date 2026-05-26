@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "AI Tab Grouper",
+  "description": "Use a configured AI provider to organize Microsoft Edge tabs into tab groups.",
+  "version": "0.1.0",
+  "permissions": [
+    "tabs",
+    "tabGroups",
+    "storage",
+    "alarms"
+  ],
+  "host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
+  "background": {
+    "service_worker": "src/background.js"
+  },
+  "action": {
+    "default_title": "AI Tab Grouper",
+    "default_popup": "src/popup.html"
+  },
+  "commands": {
+    "group-tabs": {
+      "suggested_key": {
+        "default": "Alt+Shift+G"
+      },
+      "description": "Group tabs with the configured AI provider"
+    }
+  }
+}
