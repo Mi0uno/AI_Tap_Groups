@@ -1,4 +1,5 @@
 const elements = {
+  providerInput: document.querySelector("#providerInput"),
   endpointInput: document.querySelector("#endpointInput"),
   apiKeyInput: document.querySelector("#apiKeyInput"),
   modelInput: document.querySelector("#modelInput"),
@@ -33,6 +34,10 @@ async function initializePopup() {
 }
 
 function bindEvents() {
+  elements.providerInput.addEventListener("change", () => {
+    applyProviderPreset(elements.providerInput.value);
+  });
+
   elements.saveButton.addEventListener("click", async () => {
     await withBusyState(async () => {
       await saveSettings();
@@ -56,6 +61,7 @@ function bindEvents() {
 }
 
 function fillSettings(settings) {
+  populateProviderOptions(settings.providerId || "openai");
   elements.endpointInput.value = settings.endpoint || "";
   elements.apiKeyInput.value = settings.apiKey || "";
   elements.modelInput.value = settings.model || "";
@@ -71,6 +77,7 @@ function fillSettings(settings) {
 
 function readSettings() {
   return {
+    providerId: elements.providerInput.value,
     endpoint: elements.endpointInput.value,
     apiKey: elements.apiKeyInput.value,
     model: elements.modelInput.value,
@@ -83,6 +90,30 @@ function readSettings() {
     autoGroupEnabled: elements.autoGroupEnabledInput.checked,
     autoGroupDebounceSeconds: Number(elements.autoGroupDebounceInput.value)
   };
+}
+
+function populateProviderOptions(selectedProviderId) {
+  if (elements.providerInput.options.length === 0) {
+    for (const provider of AI_PROVIDER_PRESETS) {
+      const option = document.createElement("option");
+      option.value = provider.id;
+      option.textContent = provider.label;
+      elements.providerInput.append(option);
+    }
+  }
+
+  elements.providerInput.value = selectedProviderId;
+}
+
+function applyProviderPreset(providerId) {
+  const provider = getAiProviderPreset(providerId);
+  if (!provider || provider.id === "custom") {
+    return;
+  }
+
+  elements.endpointInput.value = provider.endpoint;
+  elements.modelInput.value = provider.model;
+  setStatus(`已切换到 ${provider.label}，请输入对应 API Key。`);
 }
 
 async function saveSettings() {

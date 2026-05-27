@@ -1,7 +1,15 @@
+importScripts("providers.js");
+
+const DEFAULT_PROVIDER = getDefaultAiProviderPreset();
 const DEFAULT_SETTINGS = {
-  endpoint: "https://api.openai.com/v1/chat/completions",
+  providerId: DEFAULT_PROVIDER.id,
+  endpoint: DEFAULT_PROVIDER.endpoint,
   apiKey: "",
-  model: "gpt-4.1-mini",
+  model: DEFAULT_PROVIDER.model,
+  providerFormat: DEFAULT_PROVIDER.format,
+  authType: DEFAULT_PROVIDER.authType,
+  apiVersion: DEFAULT_PROVIDER.apiVersion || "",
+  maxTokensField: DEFAULT_PROVIDER.maxTokensField || "max_tokens",
   scope: "currentWindow",
   includePinned: false,
   sendFullUrls: false,
@@ -234,9 +242,11 @@ async function saveSettings(rawSettings) {
 }
 
 function sanitizeSettings(rawSettings = {}) {
-  const endpoint = String(rawSettings.endpoint || DEFAULT_SETTINGS.endpoint).trim();
+  const provider = getAiProviderPreset(rawSettings.providerId || DEFAULT_SETTINGS.providerId);
+  const providerId = provider.id;
+  const endpoint = String(rawSettings.endpoint || provider.endpoint || DEFAULT_SETTINGS.endpoint).trim();
   const apiKey = String(rawSettings.apiKey || "").trim();
-  const model = String(rawSettings.model || DEFAULT_SETTINGS.model).trim();
+  const model = String(rawSettings.model || provider.model || DEFAULT_SETTINGS.model).trim();
   const scope = rawSettings.scope === "allWindows" ? "allWindows" : "currentWindow";
   const groupPrefix = String(rawSettings.groupPrefix || "").trim().slice(0, 20);
   const maxGroups = clamp(Number(rawSettings.maxGroups || DEFAULT_SETTINGS.maxGroups), 2, MAX_GROUPS_SETTING);
@@ -252,9 +262,14 @@ function sanitizeSettings(rawSettings = {}) {
   );
 
   return {
+    providerId,
     endpoint,
     apiKey,
     model,
+    providerFormat: provider.format || DEFAULT_SETTINGS.providerFormat,
+    authType: provider.authType || DEFAULT_SETTINGS.authType,
+    apiVersion: provider.apiVersion || "",
+    maxTokensField: provider.maxTokensField || DEFAULT_SETTINGS.maxTokensField,
     scope,
     includePinned: Boolean(rawSettings.includePinned),
     sendFullUrls: Boolean(rawSettings.sendFullUrls),
@@ -775,6 +790,7 @@ function createAutoGroupingFingerprint(tabs, settings) {
 
   return hashString(JSON.stringify({
     settings: {
+      providerId: settings.providerId,
       endpoint: settings.endpoint,
       model: settings.model,
       scope: settings.scope,
@@ -820,33 +836,19 @@ async function suggestGroups(tabs, settings) {
     return createFallbackGroups(tabs, settings);
   }
 
-  const payload = {
-    model: settings.model,
-    temperature: 0.1,
-    max_tokens: 1200,
-    response_format: { type: "json_object" },
-    messages: [
-      {
-        role: "system",
-        content: [
-          "You group browser tabs for a productivity-focused user.",
-          "Return only JSON with this shape:",
-          "{\"groups\":[{\"name\":\"short label\",\"color\":\"blue|red|yellow|green|pink|purple|cyan|orange|grey\",\"tabIds\":[1,2]}]}",
-          "Rules: use only provided tab ids, do not exceed the requested maxGroups value, skip single-tab groups unless the tab is clearly standalone, keep group names under 20 characters."
-        ].join(" ")
-      },
-      {
-        role: "user",
-        content: JSON.stringify({
-          maxGroups: settings.maxGroups,
-          tabs: tabs.map((tab) => formatTabForAi(tab, settings))
-        })
-      }
-    ]
-  };
-  applyProviderSpecificOptions(payload, settings);
-
-  const parsedContent = await requestAiJson(payload, settings);
+  const parsedContent = await requestAiJson({
+    maxTokens: 1200,
+    systemPrompt: [
+      "You group browser tabs for a productivity-focused user.",
+      "Return only JSON with this shape:",
+      "{\"groups\":[{\"name\":\"short label\",\"color\":\"blue|red|yellow|green|pink|purple|cyan|orange|grey\",\"tabIds\":[1,2]}]}",
+      "Rules: use only provided tab ids, do not exceed the requested maxGroups value, skip single-tab groups unless the tab is clearly standalone, keep group names under 20 characters."
+    ].join(" "),
+    userPayload: {
+      maxGroups: settings.maxGroups,
+      tabs: tabs.map((tab) => formatTabForAi(tab, settings))
+    }
+  }, settings);
   return normalizeAiGroups(parsedContent.groups, tabs, settings);
 }
 
@@ -856,56 +858,40 @@ async function suggestIncrementalGroups(windowId, candidateTabs, allWindowTabs, 
   }
 
   const existingGroups = await getExistingGroupSummaries(windowId, allWindowTabs);
-  const payload = {
-    model: settings.model,
-    temperature: 0.1,
-    max_tokens: 1600,
-    response_format: { type: "json_object" },
-    messages: [
-      {
-        role: "system",
-        content: [
-          "You incrementally organize browser tabs without creating duplicate tab groups.",
-          "Return only JSON with this shape:",
-          "{\"groups\":[{\"name\":\"short label\",\"existingGroupId\":123,\"color\":\"blue|red|yellow|green|pink|purple|cyan|orange|grey\",\"tabIds\":[1,2]}]}",
-          "Use existingGroupId when a candidate belongs in an existing group, especially when the name, topic, site, or content type is similar.",
-          "Create a new group only when no existing group fits.",
-          "For multiple tabs from the same video site, classify by intent/content type from title and URL, such as search, anime, videos, courses, music, research, or creator/channel.",
-          "Never create a new group whose meaning duplicates an existing group. Do not exceed maxGroups. Keep names under 20 characters."
-        ].join(" ")
-      },
-      {
-        role: "user",
-        content: JSON.stringify({
-          maxGroups: settings.maxGroups,
-          existingGroups,
-          candidateTabs: candidateTabs.map((tab) => formatTabForAi(tab, settings))
-        })
-      }
-    ]
-  };
-  applyProviderSpecificOptions(payload, settings);
-
-  const parsedContent = await requestAiJson(payload, settings);
+  const parsedContent = await requestAiJson({
+    maxTokens: 1600,
+    systemPrompt: [
+      "You incrementally organize browser tabs without creating duplicate tab groups.",
+      "Return only JSON with this shape:",
+      "{\"groups\":[{\"name\":\"short label\",\"existingGroupId\":123,\"color\":\"blue|red|yellow|green|pink|purple|cyan|orange|grey\",\"tabIds\":[1,2]}]}",
+      "Use existingGroupId when a candidate belongs in an existing group, especially when the name, topic, site, or content type is similar.",
+      "Create a new group only when no existing group fits.",
+      "For multiple tabs from the same video site, classify by intent/content type from title and URL, such as search, anime, videos, courses, music, research, or creator/channel.",
+      "Never create a new group whose meaning duplicates an existing group. Do not exceed maxGroups. Keep names under 20 characters."
+    ].join(" "),
+    userPayload: {
+      maxGroups: settings.maxGroups,
+      existingGroups,
+      candidateTabs: candidateTabs.map((tab) => formatTabForAi(tab, settings))
+    }
+  }, settings);
   return normalizeAiGroups(parsedContent.groups, candidateTabs, settings, {
     existingGroupIds: new Set(existingGroups.map((group) => group.id)),
     allowSingleTabExistingGroup: true
   });
 }
 
-async function requestAiJson(payload, settings) {
+async function requestAiJson(task, settings) {
+  const request = buildProviderRequest(task, settings);
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), settings.aiRequestTimeoutSeconds * 1000);
   let response;
 
   try {
-    response = await fetch(settings.endpoint, {
+    response = await fetch(request.endpoint, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${settings.apiKey}`
-      },
-      body: JSON.stringify(payload),
+      headers: request.headers,
+      body: JSON.stringify(request.body),
       signal: controller.signal
     });
   } catch (error) {
@@ -924,21 +910,89 @@ async function requestAiJson(payload, settings) {
   }
 
   const responseBody = await response.json();
-  const content = responseBody?.choices?.[0]?.message?.content;
+  const content = extractProviderResponseContent(responseBody, settings);
   if (!content) {
-    throw new Error("AI provider response did not include choices[0].message.content");
+    throw new Error("AI provider response did not include text content");
   }
 
   const parsedContent = parseJsonContent(content);
   return parsedContent;
 }
 
-function applyProviderSpecificOptions(payload, settings) {
-  if (!isDeepSeekV4Request(settings)) {
-    return;
+function buildProviderRequest(task, settings) {
+  if (settings.providerFormat === "anthropic") {
+    return buildAnthropicRequest(task, settings);
   }
 
-  payload.thinking = { type: "disabled" };
+  return buildOpenAiCompatibleRequest(task, settings);
+}
+
+function buildOpenAiCompatibleRequest(task, settings) {
+  const body = {
+    model: settings.model,
+    temperature: 0.1,
+    response_format: { type: "json_object" },
+    messages: [
+      { role: "system", content: task.systemPrompt },
+      { role: "user", content: JSON.stringify(task.userPayload) }
+    ]
+  };
+  body[settings.maxTokensField || "max_tokens"] = task.maxTokens;
+
+  if (isDeepSeekV4Request(settings)) {
+    body.thinking = { type: "disabled" };
+  }
+
+  return {
+    endpoint: settings.endpoint,
+    headers: buildProviderHeaders(settings),
+    body
+  };
+}
+
+function buildAnthropicRequest(task, settings) {
+  return {
+    endpoint: settings.endpoint,
+    headers: buildProviderHeaders(settings),
+    body: {
+      model: settings.model,
+      max_tokens: task.maxTokens,
+      temperature: 0.1,
+      system: `${task.systemPrompt} Return valid JSON only. Do not wrap it in markdown.`,
+      messages: [
+        { role: "user", content: JSON.stringify(task.userPayload) }
+      ]
+    }
+  };
+}
+
+function buildProviderHeaders(settings) {
+  const headers = { "Content-Type": "application/json" };
+
+  if (settings.authType === "x-api-key") {
+    headers["x-api-key"] = settings.apiKey;
+    if (settings.apiVersion) {
+      headers["anthropic-version"] = settings.apiVersion;
+    }
+    return headers;
+  }
+
+  if (settings.authType === "api-key") {
+    headers["api-key"] = settings.apiKey;
+    return headers;
+  }
+
+  headers.Authorization = `Bearer ${settings.apiKey}`;
+  return headers;
+}
+
+function extractProviderResponseContent(responseBody, settings) {
+  if (settings.providerFormat === "anthropic") {
+    const textPart = responseBody?.content?.find((part) => part.type === "text");
+    return textPart?.text;
+  }
+
+  return responseBody?.choices?.[0]?.message?.content;
 }
 
 function isDeepSeekV4Request(settings) {
